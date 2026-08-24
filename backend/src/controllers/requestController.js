@@ -270,6 +270,13 @@ async function getRequestById(req, res, next) {
     const { id } = req.params;
     const user = req.user;
 
+    const reqId = parseInt(id, 10);
+    if (isNaN(reqId) || reqId <= 0) {
+      return res.status(400).json({
+        error: { status: 400, message: 'Invalid request ID. Must be a positive integer.', code: 'INVALID_ID' }
+      });
+    }
+
     const request = get(`
       SELECT r.*, rt.code as type_code, rt.name as type_name, rt.target_sla_hours, rt.default_stages_json,
              u.full_name as requester_name, u.email as requester_email, u.role as requester_role,
@@ -345,6 +352,13 @@ async function executeAction(req, res, next) {
   try {
     const { id } = req.params;
     const { action, comment, next_assignee_id } = req.body;
+
+    const reqId = parseInt(id, 10);
+    if (isNaN(reqId) || reqId <= 0) {
+      return res.status(400).json({
+        error: { status: 400, message: 'Invalid request ID. Must be a positive integer.', code: 'INVALID_ID' }
+      });
+    }
 
     if (!action) {
       return res.status(422).json({

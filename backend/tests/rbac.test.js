@@ -135,4 +135,13 @@ describe('Security & RBAC Comprehensive Audit Test Suite', () => {
     expect(res.statusCode).toEqual(400);
     expect(res.body.error.message).toContain('Invalid status transition');
   });
+
+  it('11. REJECT malformed non-integer request ID -> BLOCKED (400)', async () => {
+    const res = await request(app)
+      .get('/api/requests/invalid-id-abc')
+      .set('Authorization', `Bearer ${employeeToken}`);
+
+    expect(res.statusCode).toEqual(400);
+    expect(res.body.error.code).toEqual('INVALID_ID');
+  });
 });
