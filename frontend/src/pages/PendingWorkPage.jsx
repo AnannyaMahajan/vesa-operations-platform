@@ -158,6 +158,7 @@ export default function PendingWorkPage() {
                       <th>Requester</th>
                       <th>Process Type</th>
                       <th>Title</th>
+                      <th>Action Needed</th>
                       <th>Priority</th>
                       <th>Status</th>
                       <th>SLA Target</th>
@@ -165,37 +166,72 @@ export default function PendingWorkPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedRequests.map(r => (
-                      <tr key={r.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent)' }}>{r.request_number}</td>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{r.requester_name}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{r.department_code}</div>
-                        </td>
-                        <td><span style={{ fontSize: '0.78rem', fontWeight: 600 }}>{r.type_name}</span></td>
-                        <td style={{ maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</td>
-                        <td>
-                          <span style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: r.priority === 'URGENT' ? '#ffe4e6' : (r.priority === 'HIGH' ? '#fef3c7' : '#f5f5f4'),
-                            color: r.priority === 'URGENT' ? '#e11d48' : (r.priority === 'HIGH' ? '#d97706' : '#57534e')
-                          }}>
-                            {r.priority}
-                          </span>
-                        </td>
-                        <td><StatusBadge status={r.status} /></td>
-                        <td><SlaBadge slaStatus={r.sla_status} /></td>
-                        <td style={{ textAlign: 'right' }}>
-                          <Link to={`/requests/${r.id}`} className="btn btn-primary" style={{ padding: '3px 8px', fontSize: '0.72rem', height: '24px' }}>
-                            <Eye size={12} />
-                            <span>Action</span>
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedRequests.map(r => {
+                      let actionCallout = 'Review Required';
+                      let badgeBg = '#eff6ff';
+                      let badgeColor = '#1d4ed8';
+
+                      if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVAL_PENDING'].includes(r.status)) {
+                        actionCallout = 'Approval Required';
+                        badgeBg = '#fef3c7';
+                        badgeColor = '#b45309';
+                      } else if (['APPROVED', 'PROCESSING'].includes(r.status)) {
+                        actionCallout = 'Fulfillment Action';
+                        badgeBg = '#e0e7ff';
+                        badgeColor = '#4338ca';
+                      } else if (r.status === 'CHANGES_REQUESTED') {
+                        actionCallout = 'Update & Resubmit';
+                        badgeBg = '#fee2e2';
+                        badgeColor = '#b91c1c';
+                      }
+
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent)' }}>{r.request_number}</td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{r.requester_name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{r.department_code}</div>
+                          </td>
+                          <td><span style={{ fontSize: '0.78rem', fontWeight: 600 }}>{r.type_name}</span></td>
+                          <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</td>
+                          <td>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              ● {actionCallout}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: r.priority === 'URGENT' ? '#ffe4e6' : (r.priority === 'HIGH' ? '#fef3c7' : '#f5f5f4'),
+                              color: r.priority === 'URGENT' ? '#e11d48' : (r.priority === 'HIGH' ? '#d97706' : '#57534e')
+                            }}>
+                              {r.priority}
+                            </span>
+                          </td>
+                          <td><StatusBadge status={r.status} /></td>
+                          <td><SlaBadge slaStatus={r.sla_status} /></td>
+                          <td style={{ textAlign: 'right' }}>
+                            <Link to={`/requests/${r.id}`} className="btn btn-primary" style={{ padding: '3px 8px', fontSize: '0.72rem', height: '24px' }}>
+                              <Eye size={12} />
+                              <span>Action</span>
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

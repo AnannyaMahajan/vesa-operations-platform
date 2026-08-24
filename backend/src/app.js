@@ -12,12 +12,24 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const app = express();
 
 // Security & CORS Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(cors({
   origin: '*',
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static frontend serving if built
+const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDistPath));
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
