@@ -1,10 +1,11 @@
 import React from 'react';
 import { Download } from 'lucide-react';
+import { api } from '../services/api';
 
 export default function ExportButton() {
   const handleExport = (format) => {
     const token = localStorage.getItem('vesa_jwt_token');
-    window.open(`http://localhost:5000/api/analytics/export?format=${format}&token=${token}`, '_blank');
+    window.open(`${api.exportReport(format)}&token=${token}`, '_blank');
   };
 
   return (

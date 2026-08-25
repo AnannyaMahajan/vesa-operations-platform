@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Paperclip, Upload, Download, FileText } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
+import { api } from '../services/api';
 
 export default function AttachmentViewer({ attachments = [], onUpload }) {
   const [uploading, setUploading] = useState(false);
@@ -40,7 +41,7 @@ export default function AttachmentViewer({ attachments = [], onUpload }) {
 
   const handleDownload = (id) => {
     const token = localStorage.getItem('vesa_jwt_token');
-    window.open(`http://localhost:5000/api/requests/attachments/${id}/download?token=${token}`, '_blank');
+    window.open(`${api.downloadAttachment(id)}?token=${token}`, '_blank');
   };
 
   return (

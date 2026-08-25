@@ -106,6 +106,28 @@ npm run dev      # Starts Vite dev server on http://localhost:5173
 
 ---
 
+## Production Deployment & Vercel Configuration
+
+### 1. Frontend Vercel Deployment
+1. Connect repository to [Vercel](https://vercel.com).
+2. Set Root Directory to `frontend`.
+3. Set Framework to `Vite`.
+4. Configure Build Command: `npm run build` and Output Directory: `dist`.
+5. Set Environment Variable: `VITE_API_BASE_URL=https://<YOUR-BACKEND-API-URL>/api`.
+6. Deploy. SPA routing is managed automatically via `frontend/vercel.json`.
+
+### 2. Backend Persistent Hosting
+The backend is an Express server using persistent SQLite/PostgreSQL storage and file uploads. Deploy to a persistent host such as **Render**, **Railway**, or **Fly.io**:
+- **Environment Variables**:
+  - `PORT=5000`
+  - `NODE_ENV=production`
+  - `JWT_SECRET=<YOUR-SECURE-RANDOM-JWT-SECRET>`
+  - `FRONTEND_URL=https://<YOUR-VERCEL-FRONTEND-URL>.vercel.app`
+
+For full production architecture diagrams, database migration steps, file storage guidelines, and smoke testing procedures, see [`docs/DEPLOYMENT.md`](file:///c:/Users/anann/OneDrive/Desktop/LastProject/docs/DEPLOYMENT.md).
+
+---
+
 ## Demo Login Personas
 
 | Role Persona | Email Address | Password | Focus Area |
