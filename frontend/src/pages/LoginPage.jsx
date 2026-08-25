@@ -15,6 +15,9 @@ export default function LoginPage() {
   const getCleanErrorMessage = (err) => {
     if (!err) return 'Unable to sign in. Please verify your credentials and try again.';
     const msg = String(err.message || err);
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Network request failed')) {
+      return 'Unable to connect to the backend API server. Please configure VITE_API_BASE_URL in Vercel Environment Variables or ensure your backend server is online.';
+    }
     if (msg.includes('JSON') || msg.includes('Unexpected token') || msg.includes('SyntaxError')) {
       return 'Unable to sign you in right now. Please check your credentials and try again.';
     }
