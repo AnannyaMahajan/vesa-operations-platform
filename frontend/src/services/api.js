@@ -16,17 +16,23 @@ function getMockRequestsDB() {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch (e) {}
+  } catch (err) {
+    console.warn('[Mock DB] Failed to parse saved requests:', err.message);
+  }
   try {
     localStorage.setItem('vesa_mock_requests_db', JSON.stringify(MOCK_REQUESTS));
-  } catch (e) {}
+  } catch (err) {
+    console.warn('[Mock DB] Failed to set initial requests:', err.message);
+  }
   return MOCK_REQUESTS;
 }
 
 function saveMockRequestsDB(requests) {
   try {
     localStorage.setItem('vesa_mock_requests_db', JSON.stringify(requests));
-  } catch (e) {}
+  } catch (err) {
+    console.warn('[Mock DB] Failed to save requests:', err.message);
+  }
 }
 
 async function handleMockRequest(endpoint, options = {}) {
@@ -245,8 +251,6 @@ async function handleMockRequest(endpoint, options = {}) {
   if (endpoint.startsWith('/audit-logs')) {
     return { auditLogs: MOCK_AUDIT_LOGS, audit_logs: MOCK_AUDIT_LOGS };
   }
-
-  return {};
 
   return {};
 }
