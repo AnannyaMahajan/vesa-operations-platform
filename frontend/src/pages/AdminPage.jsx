@@ -29,7 +29,7 @@ export default function AdminPage() {
       const sRes = await api.getSlaConfigs();
       setUsers(uRes.users || []);
       setDepartments(dRes.departments || []);
-      setSlaConfigs(sRes.requestTypes || []);
+      setSlaConfigs(sRes.requestTypes || sRes.sla_configs || []);
     } catch (err) {
       console.error(err);
     } finally {

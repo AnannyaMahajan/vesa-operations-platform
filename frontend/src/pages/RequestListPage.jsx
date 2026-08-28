@@ -32,8 +32,17 @@ export default function RequestListPage() {
       if (slaStatus) params.sla_status = slaStatus;
 
       const res = await api.getRequests(params);
-      setRequests(res.data || []);
-      setPagination(res.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
+      const listData = res.data || res.requests || [];
+      const totalCount = res.pagination?.total ?? res.total ?? listData.length;
+      const totalP = res.pagination?.totalPages ?? Math.ceil(totalCount / 10) ?? 1;
+
+      setRequests(listData);
+      setPagination({
+        total: totalCount,
+        page,
+        limit: 10,
+        totalPages: Math.max(1, totalP)
+      });
     } catch (err) {
       console.error('Failed to load requests:', err);
     } finally {

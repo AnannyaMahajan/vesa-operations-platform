@@ -23,6 +23,9 @@ export default function Sidebar() {
     : 'U';
 
   const isItemActive = (targetPath) => {
+    if (targetPath === '/requests') {
+      return location.pathname === '/requests' || (location.pathname.startsWith('/requests/') && location.pathname !== '/requests/create');
+    }
     return location.pathname === targetPath;
   };
 

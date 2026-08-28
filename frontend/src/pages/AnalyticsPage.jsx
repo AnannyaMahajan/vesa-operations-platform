@@ -12,8 +12,16 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.getDashboardStats();
-        setStats(res);
+        const [statsRes, bottlenecksRes] = await Promise.all([
+          api.getDashboardStats(),
+          api.getBottlenecks().catch(() => ({ bottlenecks: [] }))
+        ]);
+        setStats({
+          ...statsRes,
+          bottlenecks: (bottlenecksRes && bottlenecksRes.bottlenecks && bottlenecksRes.bottlenecks.length > 0)
+            ? bottlenecksRes.bottlenecks
+            : (statsRes.bottlenecks || [])
+        });
       } catch (err) {
         console.error(err);
       } finally {
@@ -22,6 +30,13 @@ export default function AnalyticsPage() {
     }
     load();
   }, []);
+
+  const complianceRate = stats?.slaPerformance?.complianceRate ?? stats?.slaComplianceRate ?? 100;
+  const completedWithinSla = stats?.slaPerformance?.completed_within_sla ?? stats?.slaBreakdown?.completed_within_sla ?? 0;
+  const overdueCount = stats?.counts?.overdue ?? stats?.slaBreakdown?.overdue ?? 0;
+  const bottlenecksList = stats?.bottlenecks || [];
+  const deptList = stats?.workloadByDept || stats?.workloadByDepartment || [];
+  const typeList = stats?.workloadByType || [];
 
   return (
     <div className="app-layout">
@@ -49,7 +64,7 @@ export default function AnalyticsPage() {
                     <TrendingUp size={24} />
                   </div>
                   <div>
-                    <div className="stat-value">{stats?.slaPerformance?.complianceRate}%</div>
+                    <div className="stat-value">{complianceRate}%</div>
                     <div className="stat-label">SLA Compliance Rate</div>
                   </div>
                 </div>
@@ -59,7 +74,7 @@ export default function AnalyticsPage() {
                     <CheckCircle size={24} />
                   </div>
                   <div>
-                    <div className="stat-value">{stats?.slaPerformance?.completed_within_sla}</div>
+                    <div className="stat-value">{completedWithinSla}</div>
                     <div className="stat-label">Met SLA Targets</div>
                   </div>
                 </div>
@@ -69,7 +84,7 @@ export default function AnalyticsPage() {
                     <AlertTriangle size={24} />
                   </div>
                   <div>
-                    <div className="stat-value">{stats?.counts?.overdue}</div>
+                    <div className="stat-value">{overdueCount}</div>
                     <div className="stat-label">Active Overdue Requests</div>
                   </div>
                 </div>
@@ -92,7 +107,7 @@ export default function AnalyticsPage() {
                   <span>Smart Bottleneck & Operational Delay Detector</span>
                 </h3>
 
-                {stats?.bottlenecks?.length === 0 ? (
+                {bottlenecksList.length === 0 ? (
                   <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No operational bottlenecks detected! All request stages are processing smoothly.
                   </div>
@@ -109,19 +124,24 @@ export default function AnalyticsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {stats?.bottlenecks?.map((bn, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: 700 }}>{bn.status.replace('_', ' ')}</td>
-                            <td>{bn.type_name}</td>
-                            <td><strong>{bn.stuck_count} Requests</strong></td>
-                            <td>{Number(bn.avg_hours_stuck || 0).toFixed(1)} Hours</td>
-                            <td>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: bn.avg_hours_stuck > 24 ? '#e11d48' : '#d97706' }}>
-                                {bn.avg_hours_stuck > 24 ? 'CRITICAL BOTTLENECK' : 'MODERATE DELAY'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {bottlenecksList.map((bn, idx) => {
+                          const statusText = (bn.status || bn.stage_name || 'PENDING').replace('_', ' ');
+                          const hoursStuck = Number(bn.avg_hours_stuck || bn.avg_hours || 0);
+                          const waitingCount = bn.stuck_count || bn.pending_count || 1;
+                          return (
+                            <tr key={idx}>
+                              <td style={{ fontWeight: 700 }}>{statusText}</td>
+                              <td>{bn.type_name || 'General Request'}</td>
+                              <td><strong>{waitingCount} Request(s)</strong></td>
+                              <td>{hoursStuck.toFixed(1)} Hours</td>
+                              <td>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: hoursStuck > 24 ? '#e11d48' : '#d97706' }}>
+                                  {hoursStuck > 24 ? 'CRITICAL BOTTLENECK' : 'MODERATE DELAY'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -133,9 +153,9 @@ export default function AnalyticsPage() {
                 <div className="card">
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Workload by Department</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {stats?.workloadByDept?.map(d => (
-                      <div key={d.department_code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{d.department_name} ({d.department_code})</span>
+                    {deptList.map(d => (
+                      <div key={d.department_code || d.department_name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{d.department_name} ({d.department_code || 'N/A'})</span>
                         <strong style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>{d.count}</strong>
                       </div>
                     ))}
@@ -145,8 +165,8 @@ export default function AnalyticsPage() {
                 <div className="card">
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>Workload by Request Type</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {stats?.workloadByType?.map(t => (
-                      <div key={t.type_code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
+                    {typeList.map(t => (
+                      <div key={t.type_code || t.type_name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t.type_name}</span>
                         <strong style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>{t.count}</strong>
                       </div>

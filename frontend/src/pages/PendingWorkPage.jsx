@@ -37,14 +37,14 @@ export default function PendingWorkPage() {
   const loadPendingWork = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch all requests authorized for the user
-      const res = await api.getRequests({ limit: 100 });
-      const allAuthorized = res.data || [];
+      // Fetch requests requiring pending action for the user
+      const res = await api.getRequests({ limit: 100, pending_action: true });
+      const allAuthorized = res.data || res.requests || [];
       const actionableStatuses = getActionableStatusesForRole(user?.role);
 
       // Role-aware actionable filtering
       const filtered = allAuthorized.filter(r => {
-        // Exclude terminal completed/rejected states
+        // Exclude terminal completed/rejected/cancelled states
         if (['COMPLETED', 'REJECTED', 'CANCELLED'].includes(r.status)) {
           return false;
         }

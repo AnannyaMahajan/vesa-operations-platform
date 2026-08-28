@@ -46,17 +46,53 @@ async function handleMockRequest(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/analytics/dashboard')) {
+    const total = MOCK_REQUESTS.length;
+    const pending = MOCK_REQUESTS.filter(r => ['APPROVAL_PENDING', 'UNDER_REVIEW', 'SUBMITTED'].includes(r.status)).length;
+    const completed = MOCK_REQUESTS.filter(r => r.status === 'COMPLETED').length;
+    const overdue = MOCK_REQUESTS.filter(r => r.sla_status === 'OVERDUE').length;
     return {
-      total_requests: MOCK_REQUESTS.length,
-      pending_approvals: MOCK_REQUESTS.filter(r => r.status === 'APPROVAL_PENDING' || r.status === 'UNDER_REVIEW').length,
-      completed_requests: MOCK_REQUESTS.filter(r => r.status === 'COMPLETED').length,
-      overdue_requests: MOCK_REQUESTS.filter(r => r.sla_status === 'OVERDUE').length,
-      total_users: MOCK_USERS.length,
-      sla_compliance_rate: 85,
-      department_breakdown: [
-        { department_name: 'Product Engineering', count: 2 },
-        { department_name: 'Marketing & Growth', count: 1 },
-        { department_name: 'Operations & Logistics', count: 1 }
+      counts: {
+        total,
+        open: pending,
+        pending_approval: pending,
+        in_progress: MOCK_REQUESTS.filter(r => r.status === 'PROCESSING').length,
+        completed,
+        rejected: MOCK_REQUESTS.filter(r => r.status === 'REJECTED').length,
+        overdue
+      },
+      slaBreakdown: {
+        within_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'WITHIN_SLA').length,
+        approaching_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'APPROACHING_SLA').length,
+        overdue,
+        completed_within_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'COMPLETED_WITHIN_SLA').length,
+        completed_after_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'COMPLETED_AFTER_SLA').length
+      },
+      slaComplianceRate: 85,
+      slaPerformance: {
+        complianceRate: 85,
+        completed_within_sla: 1,
+        completed_after_sla: 0,
+        within_sla: 2,
+        overdue: 1
+      },
+      workloadByType: [
+        { type_name: 'Software Access Request', type_code: 'SOFTWARE_ACCESS', count: 1 },
+        { type_name: 'Expense Reimbursement', type_code: 'EXPENSE_REIMBURSEMENT', count: 1 },
+        { type_name: 'Document Approval', type_code: 'DOCUMENT_APPROVAL', count: 1 },
+        { type_name: 'Equipment Request', type_code: 'EQUIPMENT_REQUEST', count: 1 }
+      ],
+      workloadByDepartment: [
+        { department_name: 'Product Engineering', department_code: 'ENG', count: 2 },
+        { department_name: 'Marketing & Growth', department_code: 'MKT', count: 1 },
+        { department_name: 'Operations & Logistics', department_code: 'OPS', count: 1 }
+      ],
+      workloadByDept: [
+        { department_name: 'Product Engineering', department_code: 'ENG', count: 2 },
+        { department_name: 'Marketing & Growth', department_code: 'MKT', count: 1 },
+        { department_name: 'Operations & Logistics', department_code: 'OPS', count: 1 }
+      ],
+      bottlenecks: [
+        { status: 'UNDER_REVIEW', type_name: 'Software Access Request', stuck_count: 1, avg_hours_stuck: 18 }
       ]
     };
   }
@@ -64,8 +100,8 @@ async function handleMockRequest(endpoint, options = {}) {
   if (endpoint.startsWith('/analytics/bottlenecks')) {
     return {
       bottlenecks: [
-        { stage_name: 'Department Director Final Sign-off', avg_hours: 42, pending_count: 1 },
-        { stage_name: 'Finance Verification', avg_hours: 18, pending_count: 1 }
+        { status: 'UNDER_REVIEW', type_name: 'Software Access Request', stuck_count: 1, avg_hours_stuck: 18 },
+        { status: 'APPROVAL_PENDING', type_name: 'Expense Reimbursement', stuck_count: 1, avg_hours_stuck: 24 }
       ]
     };
   }
@@ -74,7 +110,7 @@ async function handleMockRequest(endpoint, options = {}) {
     const id = parseInt(endpoint.split('/')[2], 10);
     const reqItem = MOCK_REQUESTS.find(r => r.id === id) || MOCK_REQUESTS[0];
     if (endpoint.endsWith('/action')) {
-      reqItem.status = body.action === 'APPROVED' ? 'COMPLETED' : 'REJECTED';
+      reqItem.status = body.action === 'APPROVED' ? 'COMPLETED' : (body.action === 'REJECT' ? 'REJECTED' : 'PROCESSING');
       return { message: `Request ${body.action} successfully (Demo Mode)`, request: reqItem };
     }
     if (endpoint.endsWith('/comments')) {
@@ -89,27 +125,75 @@ async function handleMockRequest(endpoint, options = {}) {
       reqItem.comments.push(commentObj);
       return { message: 'Comment added (Demo Mode)', comment: commentObj };
     }
-    return { request: reqItem };
+    if (endpoint.endsWith('/attachments')) {
+      const attObj = {
+        id: Date.now(),
+        original_name: 'uploaded_document.pdf',
+        file_size: 102400,
+        uploader_name: 'Current User',
+        created_at: new Date().toISOString()
+      };
+      if (!reqItem.attachments) reqItem.attachments = [];
+      reqItem.attachments.push(attObj);
+      return { message: 'Attachment uploaded (Demo Mode)', attachment: attObj };
+    }
+    return {
+      request: reqItem,
+      approvals: [],
+      comments: reqItem.comments || [],
+      attachments: reqItem.attachments || [],
+      auditLogs: []
+    };
   }
 
   if (endpoint.startsWith('/requests')) {
     if (method === 'POST') {
+      const typeNames = {
+        'SOFTWARE_ACCESS': 'Software Access Request',
+        'EXPENSE_REIMBURSEMENT': 'Expense Reimbursement',
+        'DOCUMENT_APPROVAL': 'Document Approval',
+        'EQUIPMENT_REQUEST': 'Equipment Request'
+      };
+      const typeIds = {
+        'SOFTWARE_ACCESS': 1,
+        'EXPENSE_REIMBURSEMENT': 2,
+        'DOCUMENT_APPROVAL': 3,
+        'EQUIPMENT_REQUEST': 4
+      };
+      const typeCode = body.request_type_code || 'SOFTWARE_ACCESS';
       const newReq = {
         id: MOCK_REQUESTS.length + 1,
         request_number: `REQ-2026-${String(MOCK_REQUESTS.length + 1).padStart(5, '0')}`,
+        request_type_id: typeIds[typeCode] || 1,
+        type_code: typeCode,
+        type_name: typeNames[typeCode] || 'General Request',
         title: body.title || 'New Request',
         priority: body.priority || 'MEDIUM',
-        status: 'UNDER_REVIEW',
+        status: 'SUBMITTED',
+        requester_id: 1,
         requester_name: 'Current User',
+        department_id: 1,
         department_name: 'Product Engineering',
+        department_code: 'ENG',
         created_at: new Date().toISOString(),
         sla_status: 'WITHIN_SLA',
-        workflow_stages: []
+        target_sla_hours: 24,
+        payload: body.payload || {}
       };
       MOCK_REQUESTS.unshift(newReq);
       return { message: 'Request created successfully (Demo Mode)', request: newReq };
     }
-    return { requests: MOCK_REQUESTS, total: MOCK_REQUESTS.length, page: 1, limit: 100 };
+
+    let filtered = [...MOCK_REQUESTS];
+    if (options.params && options.params.pending_action) {
+      filtered = filtered.filter(r => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(r.status));
+    }
+    return {
+      data: filtered,
+      requests: filtered,
+      total: filtered.length,
+      pagination: { total: filtered.length, page: 1, limit: 100, totalPages: 1 }
+    };
   }
 
   if (endpoint.startsWith('/admin/users')) {
@@ -121,16 +205,18 @@ async function handleMockRequest(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/admin/sla-config')) {
-    return { sla_configs: MOCK_SLA_CONFIGS };
+    return { requestTypes: MOCK_SLA_CONFIGS, sla_configs: MOCK_SLA_CONFIGS };
   }
 
   if (endpoint.startsWith('/notifications')) {
-    return { notifications: MOCK_NOTIFICATIONS };
+    return { notifications: MOCK_NOTIFICATIONS, unreadCount: 1 };
   }
 
   if (endpoint.startsWith('/audit-logs')) {
-    return { audit_logs: MOCK_AUDIT_LOGS };
+    return { auditLogs: MOCK_AUDIT_LOGS, audit_logs: MOCK_AUDIT_LOGS };
   }
+
+  return {};
 
   return {};
 }

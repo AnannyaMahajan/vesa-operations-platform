@@ -103,13 +103,32 @@ async function getDashboardStats(req, res, next) {
       GROUP BY d.id
     `, scopeParams);
 
+    const bottlenecks = query(`
+      SELECT r.status, rt.name as type_name, COUNT(r.id) as stuck_count,
+             AVG((julianday('now') - julianday(r.created_at)) * 24) as avg_hours_stuck
+      FROM requests r
+      JOIN request_types rt ON r.request_type_id = rt.id
+      WHERE r.status NOT IN ('COMPLETED', 'REJECTED', 'CANCELLED')
+      GROUP BY r.status, rt.id
+      HAVING avg_hours_stuck > 12
+    `);
+
     res.json({
       role: user.role,
       counts: countsMap,
       slaBreakdown: slaMap,
       slaComplianceRate,
+      slaPerformance: {
+        complianceRate: slaComplianceRate,
+        completed_within_sla: slaMap.completed_within_sla,
+        completed_after_sla: slaMap.completed_after_sla,
+        within_sla: slaMap.within_sla,
+        overdue: slaMap.overdue
+      },
       workloadByType: typeWorkload,
-      workloadByDepartment: deptWorkload
+      workloadByDepartment: deptWorkload,
+      workloadByDept: deptWorkload,
+      bottlenecks
     });
   } catch (err) {
     next(err);
@@ -138,7 +157,17 @@ async function getBottleneckAnalysis(req, res, next) {
       ORDER BY r.sla_due_at ASC
     `);
 
+    const bottlenecks = query(`
+      SELECT r.status, rt.name as type_name, COUNT(r.id) as stuck_count,
+             AVG((julianday('now') - julianday(r.created_at)) * 24) as avg_hours_stuck
+      FROM requests r
+      JOIN request_types rt ON r.request_type_id = rt.id
+      WHERE r.status NOT IN ('COMPLETED', 'REJECTED', 'CANCELLED')
+      GROUP BY r.status, rt.id
+    `);
+
     res.json({
+      bottlenecks,
       bottleneckData: stageDurationRows,
       overdueRequests: overdueSummary
     });

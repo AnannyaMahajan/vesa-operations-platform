@@ -162,11 +162,13 @@ async function getRequests(req, res, next) {
     const {
       search,
       request_type_id,
+      request_type_code,
       department_id,
       status,
       priority,
       assignee_id,
       sla_status,
+      pending_action,
       page = 1,
       limit = 20
     } = req.query;
@@ -197,8 +199,17 @@ async function getRequests(req, res, next) {
 
     // Filters
     if (request_type_id) {
-      sql += ` AND r.request_type_id = ?`;
-      params.push(request_type_id);
+      if (isNaN(parseInt(request_type_id, 10))) {
+        sql += ` AND rt.code = ?`;
+        params.push(request_type_id);
+      } else {
+        sql += ` AND r.request_type_id = ?`;
+        params.push(request_type_id);
+      }
+    }
+    if (request_type_code) {
+      sql += ` AND rt.code = ?`;
+      params.push(request_type_code);
     }
     if (department_id) {
       sql += ` AND r.department_id = ?`;
@@ -219,6 +230,13 @@ async function getRequests(req, res, next) {
     if (sla_status) {
       sql += ` AND r.sla_status = ?`;
       params.push(sla_status);
+    }
+    if (pending_action === 'true' || pending_action === true) {
+      sql += ` AND r.status NOT IN ('COMPLETED', 'REJECTED', 'CANCELLED')`;
+      if (['Reporting Manager', 'Department Head / Director'].includes(user.role)) {
+        sql += ` AND r.requester_id != ?`;
+        params.push(user.id);
+      }
     }
     if (search) {
       sql += ` AND (r.request_number LIKE ? OR r.title LIKE ? OR u.full_name LIKE ?)`;
