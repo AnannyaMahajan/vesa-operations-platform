@@ -9,9 +9,30 @@ import {
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
+function getMockRequestsDB() {
+  try {
+    const saved = localStorage.getItem('vesa_mock_requests_db');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  try {
+    localStorage.setItem('vesa_mock_requests_db', JSON.stringify(MOCK_REQUESTS));
+  } catch (e) {}
+  return MOCK_REQUESTS;
+}
+
+function saveMockRequestsDB(requests) {
+  try {
+    localStorage.setItem('vesa_mock_requests_db', JSON.stringify(requests));
+  } catch (e) {}
+}
+
 async function handleMockRequest(endpoint, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : {};
+  const activeMockRequests = getMockRequestsDB();
 
   if (endpoint.startsWith('/auth/login')) {
     const user = MOCK_USERS.find(u => u.email.toLowerCase() === (body.email || '').toLowerCase()) || MOCK_USERS[0];
@@ -46,26 +67,26 @@ async function handleMockRequest(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/analytics/dashboard')) {
-    const total = MOCK_REQUESTS.length;
-    const pending = MOCK_REQUESTS.filter(r => ['APPROVAL_PENDING', 'UNDER_REVIEW', 'SUBMITTED'].includes(r.status)).length;
-    const completed = MOCK_REQUESTS.filter(r => r.status === 'COMPLETED').length;
-    const overdue = MOCK_REQUESTS.filter(r => r.sla_status === 'OVERDUE').length;
+    const total = activeMockRequests.length;
+    const pending = activeMockRequests.filter(r => ['APPROVAL_PENDING', 'UNDER_REVIEW', 'SUBMITTED'].includes(r.status)).length;
+    const completed = activeMockRequests.filter(r => r.status === 'COMPLETED').length;
+    const overdue = activeMockRequests.filter(r => r.sla_status === 'OVERDUE').length;
     return {
       counts: {
         total,
         open: pending,
         pending_approval: pending,
-        in_progress: MOCK_REQUESTS.filter(r => r.status === 'PROCESSING').length,
+        in_progress: activeMockRequests.filter(r => r.status === 'PROCESSING').length,
         completed,
-        rejected: MOCK_REQUESTS.filter(r => r.status === 'REJECTED').length,
+        rejected: activeMockRequests.filter(r => r.status === 'REJECTED').length,
         overdue
       },
       slaBreakdown: {
-        within_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'WITHIN_SLA').length,
-        approaching_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'APPROACHING_SLA').length,
+        within_sla: activeMockRequests.filter(r => r.sla_status === 'WITHIN_SLA').length,
+        approaching_sla: activeMockRequests.filter(r => r.sla_status === 'APPROACHING_SLA').length,
         overdue,
-        completed_within_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'COMPLETED_WITHIN_SLA').length,
-        completed_after_sla: MOCK_REQUESTS.filter(r => r.sla_status === 'COMPLETED_AFTER_SLA').length
+        completed_within_sla: activeMockRequests.filter(r => r.sla_status === 'COMPLETED_WITHIN_SLA').length,
+        completed_after_sla: activeMockRequests.filter(r => r.sla_status === 'COMPLETED_AFTER_SLA').length
       },
       slaComplianceRate: 85,
       slaPerformance: {
@@ -108,10 +129,16 @@ async function handleMockRequest(endpoint, options = {}) {
 
   if (endpoint.startsWith('/requests/')) {
     const id = parseInt(endpoint.split('/')[2], 10);
-    const reqItem = MOCK_REQUESTS.find(r => r.id === id) || MOCK_REQUESTS[0];
+    const reqItem = activeMockRequests.find(r => r.id === id) || activeMockRequests[0];
     if (endpoint.endsWith('/action')) {
-      reqItem.status = body.action === 'APPROVED' ? 'COMPLETED' : (body.action === 'REJECT' ? 'REJECTED' : 'PROCESSING');
-      return { message: `Request ${body.action} successfully (Demo Mode)`, request: reqItem };
+      const act = (body.action || '').toUpperCase();
+      if (act === 'APPROVE') reqItem.status = 'APPROVED';
+      else if (act === 'REJECT') reqItem.status = 'REJECTED';
+      else if (act === 'REQUEST_CHANGES') reqItem.status = 'CHANGES_REQUESTED';
+      else if (act === 'COMPLETE') reqItem.status = 'COMPLETED';
+      else reqItem.status = 'PROCESSING';
+      saveMockRequestsDB(activeMockRequests);
+      return { message: `Request ${act} successfully (Demo Mode)`, request: reqItem };
     }
     if (endpoint.endsWith('/comments')) {
       const commentObj = {
@@ -123,6 +150,7 @@ async function handleMockRequest(endpoint, options = {}) {
       };
       if (!reqItem.comments) reqItem.comments = [];
       reqItem.comments.push(commentObj);
+      saveMockRequestsDB(activeMockRequests);
       return { message: 'Comment added (Demo Mode)', comment: commentObj };
     }
     if (endpoint.endsWith('/attachments')) {
@@ -135,6 +163,7 @@ async function handleMockRequest(endpoint, options = {}) {
       };
       if (!reqItem.attachments) reqItem.attachments = [];
       reqItem.attachments.push(attObj);
+      saveMockRequestsDB(activeMockRequests);
       return { message: 'Attachment uploaded (Demo Mode)', attachment: attObj };
     }
     return {
@@ -162,8 +191,8 @@ async function handleMockRequest(endpoint, options = {}) {
       };
       const typeCode = body.request_type_code || 'SOFTWARE_ACCESS';
       const newReq = {
-        id: MOCK_REQUESTS.length + 1,
-        request_number: `REQ-2026-${String(MOCK_REQUESTS.length + 1).padStart(5, '0')}`,
+        id: activeMockRequests.length + 1,
+        request_number: `REQ-2026-${String(activeMockRequests.length + 1).padStart(5, '0')}`,
         request_type_id: typeIds[typeCode] || 1,
         type_code: typeCode,
         type_name: typeNames[typeCode] || 'General Request',
@@ -180,11 +209,12 @@ async function handleMockRequest(endpoint, options = {}) {
         target_sla_hours: 24,
         payload: body.payload || {}
       };
-      MOCK_REQUESTS.unshift(newReq);
+      activeMockRequests.unshift(newReq);
+      saveMockRequestsDB(activeMockRequests);
       return { message: 'Request created successfully (Demo Mode)', request: newReq };
     }
 
-    let filtered = [...MOCK_REQUESTS];
+    let filtered = [...activeMockRequests];
     if (options.params && options.params.pending_action) {
       filtered = filtered.filter(r => !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(r.status));
     }

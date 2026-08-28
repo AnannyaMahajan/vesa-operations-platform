@@ -1,11 +1,24 @@
 const bcrypt = require('bcryptjs');
-const { getDb, exec, run } = require('./db');
+const { getDb, exec, run, get } = require('./db');
 
-async function seed() {
-  console.log('🌱 Starting VESA Database Seeding...');
+async function seed(options = {}) {
+  const force = typeof options === 'boolean' ? options : !!(options && options.force);
 
   // Initialize DB instance
   await getDb();
+
+  // Check if database is already populated
+  try {
+    const existingUsers = get('SELECT COUNT(*) as count FROM users');
+    if (!force && existingUsers && existingUsers.count > 0) {
+      console.log('ℹ️ Database already populated. Skipping seed wipe.');
+      return;
+    }
+  } catch (e) {
+    // If table doesn't exist yet, proceed with seed
+  }
+
+  console.log('🌱 Starting VESA Database Seeding...');
 
   // Clear existing tables in correct dependency order
   exec(`
@@ -260,7 +273,7 @@ async function seed() {
 }
 
 if (require.main === module) {
-  seed().catch(err => {
+  seed({ force: true }).catch(err => {
     console.error('❌ Seeding failed:', err);
     process.exit(1);
   });
